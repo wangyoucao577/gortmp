@@ -278,6 +278,10 @@ func (conn *conn) readLoop() {
 	for !conn.closed {
 		// Read base header
 		n, vfmt, csi, err := ReadBaseHeader(conn.br)
+		if err == io.EOF {
+			glog.Warning("ReadBaseHeader EOF")
+			break
+		}
 		CheckError(err, "ReadBaseHeader")
 		conn.inBytes += uint32(n)
 		// Get chunk stream

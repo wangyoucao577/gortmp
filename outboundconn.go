@@ -24,6 +24,25 @@ const (
 	OUTBOUND_CONN_STATUS_CREATE_STREAM_OK = uint(5)
 )
 
+// OutboundConnStatusDescription returns human readable string of outbound connection status.
+func OutboundConnStatusDescription(s uint) string {
+	switch s {
+	case OUTBOUND_CONN_STATUS_CLOSE:
+		return "close"
+	case OUTBOUND_CONN_STATUS_HANDSHAKE_OK:
+		return "handshark OK"
+	case OUTBOUND_CONN_STATUS_CONNECT:
+		return "connect"
+	case OUTBOUND_CONN_STATUS_CONNECT_OK:
+		return "connect ok"
+	case OUTBOUND_CONN_STATUS_CREATE_STREAM:
+		return "create stream"
+	case OUTBOUND_CONN_STATUS_CREATE_STREAM_OK:
+		return "create stream ok"
+	}
+	return "unknown"
+}
+
 // A handler for outbound connection
 type OutboundConnHandler interface {
 	ConnHandler
@@ -81,7 +100,7 @@ func Dial(url string, handler OutboundConnHandler, maxChannelNumber int) (Outbou
 	case "rtmps":
 		c, err = tls.Dial("tcp", fmt.Sprintf("%s:%d", rtmpURL.host, rtmpURL.port), &tls.Config{InsecureSkipVerify: true})
 	default:
-		err = errors.New(fmt.Sprintf("Unsupport protocol %s", rtmpURL.protocol))
+		err = fmt.Errorf("unsupport protocol %s", rtmpURL.protocol)
 	}
 	if err != nil {
 		return nil, err

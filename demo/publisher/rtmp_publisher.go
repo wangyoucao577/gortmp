@@ -11,9 +11,9 @@ import (
 )
 
 var (
-	url         *string = flag.String("url", "rtmp://localhost:1935/live/", "The rtmp url to connect.")
-	streamName  *string = flag.String("stream", "", "Stream name to play.")
-	flvFileName *string = flag.String("flv", "1.flv", "FLV file to publish.")
+	url         *string = flag.String("url", "rtmp://localhost:1935/live/", "The rtmp url to connect")
+	streamName  *string = flag.String("stream", "", "Stream name")
+	flvFileName *string = flag.String("flv", "1.flv", "FLV file to publish")
 )
 
 type TestOutboundConnHandler struct {
@@ -33,49 +33,53 @@ func (handler *TestOutboundConnHandler) OnStatus(conn rtmp.OutboundConn) {
 		return
 	}
 	status, err = obConn.Status()
-	glog.Infof("@@@@@@@@@@@@@status: %d, err: %v\n", status, err)
+	glog.Infof("OnStatus: %s(%d), err: %v\n", rtmp.OutboundConnStatusDescription(status), status, err)
 }
 
 func (handler *TestOutboundConnHandler) OnClosed(conn rtmp.Conn) {
-	glog.Infof("@@@@@@@@@@@@@Closed\n")
+	glog.Infof("OnClosed\n")
 }
 
 func (handler *TestOutboundConnHandler) OnReceived(conn rtmp.Conn, message *rtmp.Message) {
+	glog.Infof("OnReceived: %+v\n", message)
 }
 
 func (handler *TestOutboundConnHandler) OnReceivedRtmpCommand(conn rtmp.Conn, command *rtmp.Command) {
-	glog.Infof("ReceviedRtmpCommand: %+v\n", command)
+	glog.Infof("OnReceivedRtmpCommand: %+v\n", command)
 }
 
 func (handler *TestOutboundConnHandler) OnStreamCreated(conn rtmp.OutboundConn, stream rtmp.OutboundStream) {
-	glog.Infof("Stream created: %d\n", stream.ID())
+	glog.Infof("OnStreamCreated, stream: %d\n", stream.ID())
 	createStreamChan <- stream
 }
 func (handler *TestOutboundConnHandler) OnPlayStart(stream rtmp.OutboundStream) {
-
+	glog.Infof("OnPlayStart, stream: %d\n", stream.ID())
 }
 func (handler *TestOutboundConnHandler) OnPublishStart(stream rtmp.OutboundStream) {
+	glog.Infof("OnPublishStart, stream: %d\n", stream.ID())
+
 	// Set chunk buffer size
 	go publish(stream)
 }
 
 func publish(stream rtmp.OutboundStream) {
-	glog.Infoln("1")
+	glog.Infof("publish, stream: %d\n", stream.ID())
+
 	var err error
 	flvFile, err = flv.OpenFile(*flvFileName)
 	if err != nil {
-		glog.Infof("Open FLV dump file error:", err)
+		glog.Errorf("Open FLV dump file error: %v", err)
 		return
 	}
-	glog.Infoln("2")
 	defer flvFile.Close()
+
 	startTs := uint32(0)
 	startAt := time.Now().UnixNano()
 	preTs := uint32(0)
-	glog.Infoln("3")
+
 	for status == rtmp.OUTBOUND_CONN_STATUS_CREATE_STREAM_OK {
 		if flvFile.IsFinished() {
-			glog.Info("@@@@@@@@@@@@@@File finished")
+			glog.Info("FLV file is finished")
 			flvFile.LoopBack()
 			startAt = time.Now().UnixNano()
 			startTs = uint32(0)
@@ -83,7 +87,7 @@ func publish(stream rtmp.OutboundStream) {
 		}
 		header, data, err := flvFile.ReadTag()
 		if err != nil {
-			glog.Errorf("flvFile.ReadTag() error:", err)
+			glog.Errorf("flvFile.ReadTag() error: %v", err)
 			break
 		}
 		switch header.TagType {
@@ -98,7 +102,7 @@ func publish(stream rtmp.OutboundStream) {
 		}
 		diff1 := uint32(0)
 		//		deltaTs := uint32(0)
-		if header.Timestamp > startTs {
+		if header.Timestamp >= startTs {
 			diff1 = header.Timestamp - startTs
 		} else {
 			glog.Warningf("@@@@@@@@@@@@@@diff1 header(%+v), startTs: %d\n", header, startTs)
@@ -107,7 +111,10 @@ func publish(stream rtmp.OutboundStream) {
 			//			deltaTs = diff1 - preTs
 			preTs = diff1
 		}
-		glog.Warningf("@@@@@@@@@@@@@@diff1 header(%+v), startTs: %d\n", header, startTs)
+		if glog.V(3) {
+			glog.Infof("@@@@@@@@@@@@@@diff1 header(%+v), startTs: %d\n", header, startTs)
+		}
+
 		if err = stream.PublishData(header.TagType, data, diff1); err != nil {
 			glog.Errorf("PublishData() error:", err)
 			break
@@ -125,25 +132,26 @@ func main() {
 	flag.Parse()
 	defer glog.Flush()
 
+	var err error
 	createStreamChan = make(chan rtmp.OutboundStream)
 	testHandler := &TestOutboundConnHandler{}
+
 	glog.Info("to dial")
-	glog.Info("a")
-	var err error
 	obConn, err = rtmp.Dial(*url, testHandler, 100)
 	if err != nil {
-		glog.Errorf("Dial error", err)
+		glog.Errorf("Dial failed, err: %v", err)
 		os.Exit(-1)
 	}
-	glog.Info("b")
 	defer obConn.Close()
+
 	glog.Info("to connect")
 	err = obConn.Connect()
 	if err != nil {
-		glog.Errorf("Connect error: %s", err.Error())
+		glog.Errorf("Connect failed, err: %v", err)
 		os.Exit(-1)
 	}
-	glog.Info("c")
+	glog.Info("after connect")
+
 	for {
 		select {
 		case stream := <-createStreamChan:
