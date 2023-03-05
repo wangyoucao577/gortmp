@@ -2,7 +2,5 @@ github.com/zhangpeihao/goamf v0.0.0-20140409082417-3ff2c19514a8 h1:r1JUI0wuHlgRb
 github.com/zhangpeihao/goamf v0.0.0-20140409082417-3ff2c19514a8/go.mod h1:RZd/IqzNpFANwOB9rVmsnAYpo/6KesK4PqrN1a5cRgg=
 github.com/zhangpeihao/goflv v0.0.0-20140409083800-f2c8a1d6c9e1 h1:P1ZpeZ/eZ4KQ2ri8j/Q0nfwIQLI/zSN8MfF7CbaDJvc=
 github.com/zhangpeihao/goflv v0.0.0-20140409083800-f2c8a1d6c9e1/go.mod h1:wFyCClRrEoZVYRiXdyZKK78CTiVXDkzeG5z9Z2B3k5w=
-github.com/zhangpeihao/gortmp v0.0.0-20161114025007-d5f2189e629f h1:bu2dDuNFT3zZGramPvJcCOcf7A+A89MmZQ8HE05jJus=
-github.com/zhangpeihao/gortmp v0.0.0-20161114025007-d5f2189e629f/go.mod h1:CEok2oL+WcRRueu3MjgeE2rA7PZMjOAtBHtiCFL7oD4=
 github.com/zhangpeihao/log v0.0.0-20170117094621-62e921e41859 h1:vrlOUrBlpVmIvWsd8FhUwXWzdYqYcgFzbf8j1qPkGM8=
 github.com/zhangpeihao/log v0.0.0-20170117094621-62e921e41859/go.mod h1:OAvmouyIV28taMw4SC4+hSnouObQqQkTQNOhU3Zowl0=

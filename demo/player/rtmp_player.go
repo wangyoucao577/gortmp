@@ -11,8 +11,8 @@ import (
 	"os"
 	"time"
 
-	"github.com/zhangpeihao/goflv"
-	rtmp "github.com/zhangpeihao/gortmp"
+	rtmp "github.com/wangyoucao577/gortmp"
+	flv "github.com/zhangpeihao/goflv"
 	"github.com/zhangpeihao/log"
 )
 
@@ -140,7 +140,7 @@ func main() {
 	}
 }
 
-////////////////////////////////////////////
+// //////////////////////////////////////////
 func TryHandshakeByVLC() net.Conn {
 	// listen
 	listen, err := net.Listen("tcp", ":1935")

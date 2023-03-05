@@ -6,11 +6,12 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	rtmp "github.com/zhangpeihao/gortmp"
-	"github.com/zhangpeihao/log"
 	"io"
 	"net"
 	"os"
+
+	rtmp "github.com/wangyoucao577/gortmp"
+	"github.com/zhangpeihao/log"
 )
 
 const (
