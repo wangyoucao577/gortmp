@@ -10,11 +10,17 @@ import (
 	flv "github.com/zhangpeihao/goflv"
 )
 
-var (
-	url         *string = flag.String("url", "rtmp://localhost:1935/live/", "The rtmp url to connect")
-	streamName  *string = flag.String("stream", "", "Stream name")
-	flvFileName *string = flag.String("flv", "1.flv", "FLV file to publish")
-)
+var flags struct {
+	url           string
+	streamName    string
+	inputFilePath string
+}
+
+func init() {
+	flag.StringVar(&flags.inputFilePath, "i", "", "FLV file path to publish, e.g., '1.flv'")
+	flag.StringVar(&flags.streamName, "stream", "", "Stream name")
+	flag.StringVar(&flags.url, "url", "rtmp://localhost:1935/live/", "The rtmp url to connect, e.g., 'rtmp://host[:port]/[appname[/instanceName]]'")
+}
 
 type TestOutboundConnHandler struct {
 }
@@ -23,7 +29,6 @@ var obConn rtmp.OutboundConn
 var createStreamChan chan rtmp.OutboundStream
 var videoDataSize int64
 var audioDataSize int64
-var flvFile *flv.File
 
 var status uint
 
@@ -65,8 +70,7 @@ func (handler *TestOutboundConnHandler) OnPublishStart(stream rtmp.OutboundStrea
 func publish(stream rtmp.OutboundStream) {
 	glog.Infof("publish, stream: %d\n", stream.ID())
 
-	var err error
-	flvFile, err = flv.OpenFile(*flvFileName)
+	flvFile, err := flv.OpenFile(flags.inputFilePath)
 	if err != nil {
 		glog.Errorf("Open FLV dump file error: %v", err)
 		return
@@ -137,7 +141,7 @@ func main() {
 	testHandler := &TestOutboundConnHandler{}
 
 	glog.Info("to dial")
-	obConn, err = rtmp.Dial(*url, testHandler, 100)
+	obConn, err = rtmp.Dial(flags.url, testHandler, 100)
 	if err != nil {
 		glog.Errorf("Dial failed, err: %v", err)
 		os.Exit(-1)
@@ -157,7 +161,7 @@ func main() {
 		case stream := <-createStreamChan:
 			// Publish
 			stream.Attach(testHandler)
-			err = stream.Publish(*streamName, "live")
+			err = stream.Publish(flags.streamName, "live")
 			if err != nil {
 				glog.Errorf("Publish error: %s", err.Error())
 				os.Exit(-1)
