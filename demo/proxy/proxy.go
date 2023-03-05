@@ -10,8 +10,8 @@ import (
 	"net"
 	"os"
 
+	"github.com/golang/glog"
 	rtmp "github.com/wangyoucao577/gortmp"
-	"github.com/zhangpeihao/log"
 )
 
 const (
@@ -25,14 +25,8 @@ var (
 )
 
 func main() {
-	flag.Usage = func() {
-		fmt.Fprintf(os.Stderr, "%s version[%s]\r\nUsage: %s [OPTIONS]\r\n", programName, version, os.Args[0])
-		flag.PrintDefaults()
-	}
 	flag.Parse()
-	l := log.NewLogger(".", "proxy", nil, 60, 3600*24, true)
-	rtmp.InitLogger(l)
-	defer l.Close()
+	defer glog.Flush()
 
 	// listen
 	listen, err := net.Listen("tcp", ":1935")

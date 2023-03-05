@@ -7,13 +7,14 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
-	"github.com/zhangpeihao/goamf"
-	"github.com/zhangpeihao/log"
 	"io"
 	"net"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/golang/glog"
+	amf "github.com/zhangpeihao/goamf"
 )
 
 // Conn
@@ -154,8 +155,7 @@ func NewConn(c net.Conn, br *bufio.Reader, bw *bufio.Writer, handler ConnHandler
 func (conn *conn) sendMessage(message *Message) {
 	chunkStream, found := conn.outChunkStreams[message.ChunkStreamID]
 	if !found {
-		logger.ModulePrintf(logHandler, log.LOG_LEVEL_WARNING,
-			"Can not found chunk strem id %d", message.ChunkStreamID)
+		glog.Warningf("Can not found chunk strem id %d", message.ChunkStreamID)
 		// Error
 		return
 	}
@@ -265,8 +265,7 @@ func (conn *conn) readLoop() {
 		if r := recover(); r != nil {
 			if conn.err == nil {
 				conn.err = r.(error)
-				logger.ModulePrintf(logHandler, log.LOG_LEVEL_WARNING,
-					"readLoop panic:", conn.err)
+				glog.Warningf("readLoop panic:", conn.err)
 			}
 		}
 		conn.Close()
@@ -284,7 +283,7 @@ func (conn *conn) readLoop() {
 		// Get chunk stream
 		chunkstream, found = conn.inChunkStreams[csi]
 		if !found || chunkstream == nil {
-			logger.ModulePrintf(logHandler, log.LOG_LEVEL_TRACE, "New stream 1 csi: %d, fmt: %d\n", csi, vfmt)
+			glog.V(1).Infof("New stream 1 csi: %d, fmt: %d\n", csi, vfmt)
 			chunkstream = NewInboundChunkStream(csi)
 			conn.inChunkStreams[csi] = chunkstream
 		}
@@ -293,7 +292,7 @@ func (conn *conn) readLoop() {
 		n, err = header.ReadHeader(conn.br, vfmt, csi, chunkstream.lastHeader)
 		CheckError(err, "ReadHeader")
 		if !found {
-			logger.ModulePrintf(logHandler, log.LOG_LEVEL_TRACE, "New stream 2 csi: %d, fmt: %d, header: %+v\n", csi, vfmt, header)
+			glog.V(1).Infof("New stream 2 csi: %d, fmt: %d, header: %+v\n", csi, vfmt, header)
 		}
 		conn.inBytes += uint32(n)
 		var absoluteTimestamp uint32
@@ -305,8 +304,7 @@ func (conn *conn) readLoop() {
 		case HEADER_FMT_SAME_STREAM:
 			// A new message with same stream ID
 			if chunkstream.lastHeader == nil {
-				logger.ModulePrintf(logHandler, log.LOG_LEVEL_WARNING,
-					"A new message with fmt: %d, csi: %d\n", vfmt, csi)
+				glog.Warningf("A new message with fmt: %d, csi: %d\n", vfmt, csi)
 				header.Dump("err")
 			} else {
 				header.MessageStreamID = chunkstream.lastHeader.MessageStreamID
@@ -316,8 +314,7 @@ func (conn *conn) readLoop() {
 		case HEADER_FMT_SAME_LENGTH_AND_STREAM:
 			// A new message with same stream ID, message length and message type
 			if chunkstream.lastHeader == nil {
-				logger.ModulePrintf(logHandler, log.LOG_LEVEL_WARNING,
-					"A new message with fmt: %d, csi: %d\n", vfmt, csi)
+				glog.Warningf("A new message with fmt: %d, csi: %d\n", vfmt, csi)
 				header.Dump("err")
 			}
 			header.MessageStreamID = chunkstream.lastHeader.MessageStreamID
@@ -331,8 +328,7 @@ func (conn *conn) readLoop() {
 				message = chunkstream.receivedMessage
 			}
 			if chunkstream.lastHeader == nil {
-				logger.ModulePrintf(logHandler, log.LOG_LEVEL_WARNING,
-					"A new message with fmt: %d, csi: %d\n", vfmt, csi)
+				glog.Warningf("A new message with fmt: %d, csi: %d\n", vfmt, csi)
 				header.Dump("err")
 			} else {
 				header.MessageStreamID = chunkstream.lastHeader.MessageStreamID
@@ -371,8 +367,7 @@ func (conn *conn) readLoop() {
 						break
 					} else {
 						remain -= uint32(n64)
-						logger.ModulePrintf(logHandler, log.LOG_LEVEL_TRACE,
-							"Message continue copy remain: %d\n", remain)
+						glog.V(1).Infof("Message continue copy remain: %d\n", remain)
 						continue
 					}
 				}
@@ -380,16 +375,14 @@ func (conn *conn) readLoop() {
 				if !ok || !netErr.Temporary() {
 					CheckError(err, "Read data 1")
 				}
-				logger.ModulePrintf(logHandler, log.LOG_LEVEL_TRACE,
-					"Message copy blocked!\n")
+				glog.V(1).Infof("Message copy blocked!\n")
 			}
 			// Finished message
 			conn.received(message)
 			chunkstream.receivedMessage = nil
 		} else {
 			// Unfinish
-			logger.ModulePrintf(logHandler, log.LOG_LEVEL_DEBUG,
-				"Unfinish message(remain: %d, chunksize: %d)\n", remain, conn.inChunkSize)
+			glog.V(2).Infof("Unfinish message(remain: %d, chunksize: %d)\n", remain, conn.inChunkSize)
 
 			remain = conn.inChunkSize
 			for {
@@ -401,8 +394,7 @@ func (conn *conn) readLoop() {
 						break
 					} else {
 						remain -= uint32(n64)
-						logger.ModulePrintf(logHandler, log.LOG_LEVEL_TRACE,
-							"Unfinish message continue copy remain: %d\n", remain)
+						glog.V(1).Infof("Unfinish message continue copy remain: %d\n", remain)
 						continue
 					}
 					break
@@ -411,8 +403,7 @@ func (conn *conn) readLoop() {
 				if !ok || !netErr.Temporary() {
 					CheckError(err, "Read data 2")
 				}
-				logger.ModulePrintf(logHandler, log.LOG_LEVEL_TRACE,
-					"Unfinish message copy blocked!\n")
+				glog.V(1).Infof("Unfinish message copy blocked!\n")
 			}
 			chunkstream.receivedMessage = message
 		}
@@ -430,8 +421,7 @@ func (conn *conn) readLoop() {
 }
 
 func (conn *conn) error(err error, desc string) {
-	logger.ModulePrintf(logHandler, log.LOG_LEVEL_TRACE,
-		"Conn %s err: %s\n", desc, err.Error())
+	glog.V(1).Infof("Conn %s err: %s\n", desc, err.Error())
 	if conn.err == nil {
 		conn.err = err
 	}
@@ -482,8 +472,7 @@ func (conn *conn) CreateMediaChunkStream() (*OutboundChunkStream, error) {
 	for index, occupited := range conn.mediaChunkStreamIDAllocator {
 		if !occupited {
 			newChunkStreamID = uint32((index+1)*6 + 2)
-			logger.ModulePrintf(logHandler, log.LOG_LEVEL_DEBUG,
-				"index: %d, newChunkStreamID: %d\n", index, newChunkStreamID)
+			glog.V(2).Infof("index: %d, newChunkStreamID: %d\n", index, newChunkStreamID)
 			// since allocate a newChunkStreamID, why not set the cocupited to true
 			conn.mediaChunkStreamIDAllocator[index] = true
 			break
@@ -513,7 +502,7 @@ func (conn *conn) InboundChunkStream(id uint32) (chunkStream *InboundChunkStream
 
 func (conn *conn) CloseMediaChunkStream(id uint32) {
 	// and the id is not the index of Allocator slice
-	index := (id - 2) / 6 - 1
+	index := (id-2)/6 - 1
 	conn.mediaChunkStreamIDAllocatorLocker.Lock()
 	conn.mediaChunkStreamIDAllocator[index] = false
 	conn.mediaChunkStreamIDAllocatorLocker.Unlock()
@@ -546,16 +535,14 @@ func (conn *conn) received(message *Message) {
 			// Sub type
 			subType, err = message.Buf.ReadByte()
 			if err != nil {
-				logger.ModulePrintln(logHandler, log.LOG_LEVEL_WARNING,
-					"conn::received() AGGREGATE_MESSAGE_TYPE read sub type err:", err)
+				glog.Warningf("conn::received() AGGREGATE_MESSAGE_TYPE read sub type err:", err)
 				return
 			}
 
 			// data size
 			_, err = io.ReadAtLeast(message.Buf, tmpBuf[1:], 3)
 			if err != nil {
-				logger.ModulePrintln(logHandler, log.LOG_LEVEL_WARNING,
-					"conn::received() AGGREGATE_MESSAGE_TYPE read data size err:", err)
+				glog.Warningf("conn::received() AGGREGATE_MESSAGE_TYPE read data size err:", err)
 				return
 			}
 			dataSize = binary.BigEndian.Uint32(tmpBuf)
@@ -563,8 +550,7 @@ func (conn *conn) received(message *Message) {
 			// Timestamp
 			_, err = io.ReadAtLeast(message.Buf, tmpBuf[1:], 3)
 			if err != nil {
-				logger.ModulePrintln(logHandler, log.LOG_LEVEL_WARNING,
-					"conn::received() AGGREGATE_MESSAGE_TYPE read timestamp err:", err)
+				glog.Warningf("conn::received() AGGREGATE_MESSAGE_TYPE read timestamp err:", err)
 				return
 			}
 			timestamp = binary.BigEndian.Uint32(tmpBuf)
@@ -572,8 +558,7 @@ func (conn *conn) received(message *Message) {
 			// Timestamp extend
 			timestampExt, err = message.Buf.ReadByte()
 			if err != nil {
-				logger.ModulePrintln(logHandler, log.LOG_LEVEL_WARNING,
-					"conn::received() AGGREGATE_MESSAGE_TYPE read timestamp extend err:", err)
+				glog.Warningf("conn::received() AGGREGATE_MESSAGE_TYPE read timestamp extend err:", err)
 				return
 			}
 			timestamp |= (uint32(timestampExt) << 24)
@@ -584,8 +569,7 @@ func (conn *conn) received(message *Message) {
 			// Ignore 3 bytes
 			_, err = io.ReadAtLeast(message.Buf, tmpBuf[1:], 3)
 			if err != nil {
-				logger.ModulePrintln(logHandler, log.LOG_LEVEL_WARNING,
-					"conn::received() AGGREGATE_MESSAGE_TYPE read ignore bytes err:", err)
+				glog.Warningf("conn::received() AGGREGATE_MESSAGE_TYPE read ignore bytes err:", err)
 				return
 			}
 
@@ -597,8 +581,7 @@ func (conn *conn) received(message *Message) {
 			// Data
 			_, err = io.CopyN(subMessage.Buf, message.Buf, int64(dataSize))
 			if err != nil {
-				logger.ModulePrintln(logHandler, log.LOG_LEVEL_WARNING,
-					"conn::received() AGGREGATE_MESSAGE_TYPE copy data err:", err)
+				glog.Warningf("conn::received() AGGREGATE_MESSAGE_TYPE copy data err:", err)
 				return
 			}
 
@@ -609,14 +592,12 @@ func (conn *conn) received(message *Message) {
 			if message.Buf.Len() >= 4 {
 				_, err = io.ReadAtLeast(message.Buf, tmpBuf, 4)
 				if err != nil {
-					logger.ModulePrintln(logHandler, log.LOG_LEVEL_WARNING,
-						"conn::received() AGGREGATE_MESSAGE_TYPE read previous tag size err:", err)
+					glog.Warningf("conn::received() AGGREGATE_MESSAGE_TYPE read previous tag size err:", err)
 					return
 				}
 				tmpBuf[0] = 0
 			} else {
-				logger.ModulePrintln(logHandler, log.LOG_LEVEL_WARNING,
-					"conn::received() AGGREGATE_MESSAGE_TYPE miss previous tag size")
+				glog.Warningf("conn::received() AGGREGATE_MESSAGE_TYPE miss previous tag size")
 				break
 			}
 		}
@@ -637,8 +618,7 @@ func (conn *conn) received(message *Message) {
 			case SET_PEER_BANDWIDTH:
 				conn.invokeSetPeerBandwidth(message)
 			default:
-				logger.ModulePrintf(logHandler, log.LOG_LEVEL_TRACE,
-					"Unkown message type %d in Protocol control chunk stream!\n", message.Type)
+				glog.V(1).Infof("Unkown message type %d in Protocol control chunk stream!\n", message.Type)
 			}
 		case CS_ID_COMMAND:
 			if message.StreamID == 0 {
@@ -651,37 +631,32 @@ func (conn *conn) received(message *Message) {
 					cmd.IsFlex = true
 					_, err = message.Buf.ReadByte()
 					if err != nil {
-						logger.ModulePrintln(logHandler, log.LOG_LEVEL_WARNING,
-							"Read first in flex commad err:", err)
+						glog.Warningf("Read first in flex commad err:", err)
 						return
 					}
 					fallthrough
 				case COMMAND_AMF0:
 					cmd.Name, err = amf.ReadString(message.Buf)
 					if err != nil {
-						logger.ModulePrintln(logHandler, log.LOG_LEVEL_WARNING,
-							"AMF0 Read name err:", err)
+						glog.Warningf("AMF0 Read name err:", err)
 						return
 					}
 					transactionID, err = amf.ReadDouble(message.Buf)
 					if err != nil {
-						logger.ModulePrintln(logHandler, log.LOG_LEVEL_WARNING,
-							"AMF0 Read transactionID err:", err)
+						glog.Warningf("AMF0 Read transactionID err:", err)
 						return
 					}
 					cmd.TransactionID = uint32(transactionID)
 					for message.Buf.Len() > 0 {
 						object, err = amf.ReadValue(message.Buf)
 						if err != nil {
-							logger.ModulePrintln(logHandler, log.LOG_LEVEL_WARNING,
-								"AMF0 Read object err:", err)
+							glog.Warningf("AMF0 Read object err:", err)
 							return
 						}
 						cmd.Objects = append(cmd.Objects, object)
 					}
 				default:
-					logger.ModulePrintf(logHandler, log.LOG_LEVEL_TRACE,
-						"Unkown message type %d in Command chunk stream!\n", message.Type)
+					glog.V(1).Infof("Unkown message type %d in Command chunk stream!\n", message.Type)
 				}
 				conn.invokeCommand(cmd)
 			} else {
@@ -695,21 +670,17 @@ func (conn *conn) received(message *Message) {
 
 func (conn *conn) invokeSetChunkSize(message *Message) {
 	if err := binary.Read(message.Buf, binary.BigEndian, &conn.inChunkSize); err != nil {
-		logger.ModulePrintln(logHandler, log.LOG_LEVEL_WARNING,
-			"conn::invokeSetChunkSize err:", err)
+		glog.Warningf("conn::invokeSetChunkSize err:", err)
 	}
-	logger.ModulePrintf(logHandler, log.LOG_LEVEL_TRACE,
-		"conn::invokeSetChunkSize() conn.inChunkSize = %d\n", conn.inChunkSize)
+	glog.V(1).Infof("conn::invokeSetChunkSize() conn.inChunkSize = %d\n", conn.inChunkSize)
 }
 
 func (conn *conn) invokeAbortMessage(message *Message) {
-	logger.ModulePrintln(logHandler, log.LOG_LEVEL_TRACE,
-		"conn::invokeAbortMessage()")
+	glog.V(1).Infof("conn::invokeAbortMessage()")
 }
 
 func (conn *conn) invokeAcknowledgement(message *Message) {
-	logger.ModulePrintf(logHandler, log.LOG_LEVEL_TRACE,
-		"conn::invokeAcknowledgement(): % 2x\n", message.Buf.Bytes())
+	glog.V(1).Infof("conn::invokeAcknowledgement(): % 2x\n", message.Buf.Bytes())
 }
 
 // User Control Message
@@ -722,11 +693,9 @@ func (conn *conn) invokeAcknowledgement(message *Message) {
 // +------------------------------+-------------------------
 // Figure 5 Pay load for the ‘User Control Message’.
 //
-//
 // The first 2 bytes of the message data are used to identify the Event
 // type. Event type is followed by Event data. Size of Event data field
 // is variable.
-//
 //
 // The client or the server sends this message to notify the peer about
 // the user control events. For information about the message format,
@@ -791,57 +760,53 @@ func (conn *conn) invokeUserControlMessage(message *Message) {
 	var eventType uint16
 	err := binary.Read(message.Buf, binary.BigEndian, &eventType)
 	if err != nil {
-		logger.ModulePrintf(logHandler, log.LOG_LEVEL_WARNING,
-			"conn::invokeUserControlMessage() read event type err: %s\n", err.Error())
+		glog.Warningf("conn::invokeUserControlMessage() read event type err: %s\n", err.Error())
 		return
 	}
 	switch eventType {
 	case EVENT_STREAM_BEGIN:
-		logger.ModulePrintln(logHandler, log.LOG_LEVEL_TRACE, "conn::invokeUserControlMessage() EVENT_STREAM_BEGIN")
+		glog.V(1).Infof("conn::invokeUserControlMessage() EVENT_STREAM_BEGIN")
 	case EVENT_STREAM_EOF:
-		logger.ModulePrintln(logHandler, log.LOG_LEVEL_TRACE, "conn::invokeUserControlMessage() EVENT_STREAM_EOF")
+		glog.V(1).Infof("conn::invokeUserControlMessage() EVENT_STREAM_EOF")
 	case EVENT_STREAM_DRY:
-		logger.ModulePrintln(logHandler, log.LOG_LEVEL_TRACE, "conn::invokeUserControlMessage() EVENT_STREAM_DRY")
+		glog.V(1).Infof("conn::invokeUserControlMessage() EVENT_STREAM_DRY")
 	case EVENT_SET_BUFFER_LENGTH:
-		logger.ModulePrintln(logHandler, log.LOG_LEVEL_TRACE, "conn::invokeUserControlMessage() EVENT_SET_BUFFER_LENGTH")
+		glog.V(1).Infof("conn::invokeUserControlMessage() EVENT_SET_BUFFER_LENGTH")
 	case EVENT_STREAM_IS_RECORDED:
-		logger.ModulePrintln(logHandler, log.LOG_LEVEL_TRACE, "conn::invokeUserControlMessage() EVENT_STREAM_IS_RECORDED")
+		glog.V(1).Infof("conn::invokeUserControlMessage() EVENT_STREAM_IS_RECORDED")
 	case EVENT_PING_REQUEST:
 		// Respond ping
 		// Get server timestamp
 		var serverTimestamp uint32
 		err = binary.Read(message.Buf, binary.BigEndian, &serverTimestamp)
 		if err != nil {
-			logger.ModulePrintf(logHandler, log.LOG_LEVEL_WARNING,
-				"conn::invokeUserControlMessage() read serverTimestamp err: %s\n", err.Error())
+			glog.Warningf("conn::invokeUserControlMessage() read serverTimestamp err: %s\n", err.Error())
 			return
 		}
 		respmessage := NewMessage(CS_ID_PROTOCOL_CONTROL, USER_CONTROL_MESSAGE, 0, message.Timestamp+1, nil)
 		respEventType := uint16(EVENT_PING_RESPONSE)
 		if err = binary.Write(respmessage.Buf, binary.BigEndian, &respEventType); err != nil {
-			logger.ModulePrintln(logHandler, log.LOG_LEVEL_WARNING,
-				"conn::invokeUserControlMessage() write event type err:", err)
+			glog.Warningf("conn::invokeUserControlMessage() write event type err:", err)
 			return
 		}
 		if err = binary.Write(respmessage.Buf, binary.BigEndian, &serverTimestamp); err != nil {
-			logger.ModulePrintln(logHandler, log.LOG_LEVEL_WARNING,
-				"conn::invokeUserControlMessage() write streamId err:", err)
+			glog.Warningf("conn::invokeUserControlMessage() write streamId err:", err)
 			return
 		}
-		logger.ModulePrintln(logHandler, log.LOG_LEVEL_TRACE, "conn::invokeUserControlMessage() Ping response")
+		glog.V(1).Infof("conn::invokeUserControlMessage() Ping response")
 		conn.Send(respmessage)
 	case EVENT_PING_RESPONSE:
-		logger.ModulePrintln(logHandler, log.LOG_LEVEL_TRACE, "conn::invokeUserControlMessage() EVENT_PING_RESPONSE")
+		glog.V(1).Infof("conn::invokeUserControlMessage() EVENT_PING_RESPONSE")
 	case EVENT_REQUEST_VERIFY:
-		logger.ModulePrintln(logHandler, log.LOG_LEVEL_TRACE, "conn::invokeUserControlMessage() EVENT_REQUEST_VERIFY")
+		glog.V(1).Infof("conn::invokeUserControlMessage() EVENT_REQUEST_VERIFY")
 	case EVENT_RESPOND_VERIFY:
-		logger.ModulePrintln(logHandler, log.LOG_LEVEL_TRACE, "conn::invokeUserControlMessage() EVENT_RESPOND_VERIFY")
+		glog.V(1).Infof("conn::invokeUserControlMessage() EVENT_RESPOND_VERIFY")
 	case EVENT_BUFFER_EMPTY:
-		logger.ModulePrintln(logHandler, log.LOG_LEVEL_TRACE, "conn::invokeUserControlMessage() EVENT_BUFFER_EMPTY")
+		glog.V(1).Infof("conn::invokeUserControlMessage() EVENT_BUFFER_EMPTY")
 	case EVENT_BUFFER_READY:
-		logger.ModulePrintln(logHandler, log.LOG_LEVEL_TRACE, "conn::invokeUserControlMessage() EVENT_BUFFER_READY")
+		glog.V(1).Infof("conn::invokeUserControlMessage() EVENT_BUFFER_READY")
 	default:
-		logger.ModulePrintf(logHandler, log.LOG_LEVEL_TRACE, "conn::invokeUserControlMessage() Unknown user control message :0x%x\n", eventType)
+		glog.V(1).Infof("conn::invokeUserControlMessage() Unknown user control message :0x%x\n", eventType)
 	}
 }
 
@@ -849,71 +814,59 @@ func (conn *conn) invokeWindowAcknowledgementSize(message *Message) {
 	var size uint32
 	var err error
 	if err = binary.Read(message.Buf, binary.BigEndian, &size); err != nil {
-		logger.ModulePrintln(logHandler, log.LOG_LEVEL_WARNING,
-			"conn::invokeWindowAcknowledgementSize read window size err:", err)
+		glog.Warningf("conn::invokeWindowAcknowledgementSize read window size err:", err)
 		return
 	}
 	conn.inWindowSize = size
-	logger.ModulePrintf(logHandler, log.LOG_LEVEL_TRACE,
-		"conn::invokeWindowAcknowledgementSize() conn.inWindowSize = %d\n", conn.inWindowSize)
+	glog.V(1).Infof("conn::invokeWindowAcknowledgementSize() conn.inWindowSize = %d\n", conn.inWindowSize)
 }
 
 func (conn *conn) invokeSetPeerBandwidth(message *Message) {
 	var err error
 	var size uint32
 	if err = binary.Read(message.Buf, binary.BigEndian, &conn.inBandwidth); err != nil {
-		logger.ModulePrintln(logHandler, log.LOG_LEVEL_WARNING,
-			"conn::invokeSetPeerBandwidth read window size err:", err)
+		glog.Warningf("conn::invokeSetPeerBandwidth read window size err:", err)
 		return
 	}
 	conn.inBandwidth = size
 	var limit byte
 	if limit, err = message.Buf.ReadByte(); err != nil {
-		logger.ModulePrintln(logHandler, log.LOG_LEVEL_WARNING,
-			"conn::invokeSetPeerBandwidth read limit err:", err)
+		glog.Warningf("conn::invokeSetPeerBandwidth read limit err:", err)
 		return
 	}
 	conn.inBandwidthLimit = uint8(limit)
-	logger.ModulePrintf(logHandler, log.LOG_LEVEL_TRACE,
-		"conn.inBandwidthLimit = %d/n", conn.inBandwidthLimit)
+	glog.V(1).Infof("conn.inBandwidthLimit = %d/n", conn.inBandwidthLimit)
 }
 
 func (conn *conn) invokeCommand(cmd *Command) {
-	logger.ModulePrintln(logHandler, log.LOG_LEVEL_TRACE,
-		"conn::invokeCommand()")
+	glog.V(1).Infof("conn::invokeCommand()")
 	conn.handler.OnReceivedRtmpCommand(conn, cmd)
 }
 
 func (conn *conn) SetStreamBufferSize(streamId uint32, size uint32) {
-	logger.ModulePrintf(logHandler, log.LOG_LEVEL_TRACE,
-		"conn::SetStreamBufferSize(streamId: %d, size: %d)\n", streamId, size)
+	glog.V(1).Infof("conn::SetStreamBufferSize(streamId: %d, size: %d)\n", streamId, size)
 	message := NewMessage(CS_ID_PROTOCOL_CONTROL, USER_CONTROL_MESSAGE, 0, 1, nil)
 	eventType := uint16(EVENT_SET_BUFFER_LENGTH)
 	if err := binary.Write(message.Buf, binary.BigEndian, &eventType); err != nil {
-		logger.ModulePrintln(logHandler, log.LOG_LEVEL_WARNING,
-			"conn::SetStreamBufferSize write event type err:", err)
+		glog.Warningf("conn::SetStreamBufferSize write event type err:", err)
 		return
 	}
 	if err := binary.Write(message.Buf, binary.BigEndian, &streamId); err != nil {
-		logger.ModulePrintln(logHandler, log.LOG_LEVEL_WARNING,
-			"conn::SetStreamBufferSize write streamId err:", err)
+		glog.Warningf("conn::SetStreamBufferSize write streamId err:", err)
 		return
 	}
 	if err := binary.Write(message.Buf, binary.BigEndian, &size); err != nil {
-		logger.ModulePrintln(logHandler, log.LOG_LEVEL_WARNING,
-			"conn::SetStreamBufferSize write size err:", err)
+		glog.Warningf("conn::SetStreamBufferSize write size err:", err)
 		return
 	}
 	conn.Send(message)
 }
 
 func (conn *conn) SetChunkSize(size uint32) {
-	logger.ModulePrintf(logHandler, log.LOG_LEVEL_TRACE,
-		"conn::SetChunkSize(size: %d)\n", size)
+	glog.V(1).Infof("conn::SetChunkSize(size: %d)\n", size)
 	message := NewMessage(CS_ID_PROTOCOL_CONTROL, SET_CHUNK_SIZE, 0, 0, nil)
 	if err := binary.Write(message.Buf, binary.BigEndian, &size); err != nil {
-		logger.ModulePrintln(logHandler, log.LOG_LEVEL_WARNING,
-			"conn::SetChunkSize write event type err:", err)
+		glog.Warningf("conn::SetChunkSize write event type err:", err)
 		return
 	}
 	conn.outChunkSizeTemp = size
@@ -921,31 +874,26 @@ func (conn *conn) SetChunkSize(size uint32) {
 }
 
 func (conn *conn) SetWindowAcknowledgementSize() {
-	logger.ModulePrintln(logHandler, log.LOG_LEVEL_TRACE,
-		"conn::SetWindowAcknowledgementSize")
+	glog.V(1).Infof("conn::SetWindowAcknowledgementSize")
 	// Request window acknowledgement size
 	message := NewMessage(CS_ID_PROTOCOL_CONTROL, WINDOW_ACKNOWLEDGEMENT_SIZE, 0, 0, nil)
 	if err := binary.Write(message.Buf, binary.BigEndian, &conn.outWindowSize); err != nil {
-		logger.ModulePrintln(logHandler, log.LOG_LEVEL_WARNING,
-			"conn::SetWindowAcknowledgementSize write window size err:", err)
+		glog.Warningf("conn::SetWindowAcknowledgementSize write window size err:", err)
 		return
 	}
 	message.Size = uint32(message.Buf.Len())
 	conn.Send(message)
 }
 func (conn *conn) SetPeerBandwidth(peerBandwidth uint32, limitType byte) {
-	logger.ModulePrintln(logHandler, log.LOG_LEVEL_TRACE,
-		"conn::SetPeerBandwidth")
+	glog.V(1).Infof("conn::SetPeerBandwidth")
 	// Request window acknowledgement size
 	message := NewMessage(CS_ID_PROTOCOL_CONTROL, SET_PEER_BANDWIDTH, 0, 0, nil)
 	if err := binary.Write(message.Buf, binary.BigEndian, &peerBandwidth); err != nil {
-		logger.ModulePrintln(logHandler, log.LOG_LEVEL_WARNING,
-			"conn::SetPeerBandwidth write peerBandwidth err:", err)
+		glog.Warningf("conn::SetPeerBandwidth write peerBandwidth err:", err)
 		return
 	}
 	if err := message.Buf.WriteByte(limitType); err != nil {
-		logger.ModulePrintln(logHandler, log.LOG_LEVEL_WARNING,
-			"conn::SetPeerBandwidth write limitType err:", err)
+		glog.Warningf("conn::SetPeerBandwidth write limitType err:", err)
 		return
 	}
 	message.Size = uint32(message.Buf.Len())
@@ -953,12 +901,10 @@ func (conn *conn) SetPeerBandwidth(peerBandwidth uint32, limitType byte) {
 }
 
 func (conn *conn) SendUserControlMessage(eventId uint16) {
-	logger.ModulePrintf(logHandler, log.LOG_LEVEL_TRACE,
-		"conn::SendUserControlMessage")
+	glog.V(1).Infof("conn::SendUserControlMessage")
 	message := NewMessage(CS_ID_PROTOCOL_CONTROL, USER_CONTROL_MESSAGE, 0, 0, nil)
 	if err := binary.Write(message.Buf, binary.BigEndian, &eventId); err != nil {
-		logger.ModulePrintln(logHandler, log.LOG_LEVEL_WARNING,
-			"conn::SendUserControlMessage write event type err:", err)
+		glog.Warningf("conn::SendUserControlMessage write event type err:", err)
 		return
 	}
 	conn.Send(message)

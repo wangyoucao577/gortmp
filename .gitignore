@@ -161,3 +161,9 @@ pip-log.txt
 
 # Mac crap
 .DS_Store
+
+*.log
+demo/publisher/publisher
+demo/proxy/proxy
+demo/player/player
+demo/server/server

@@ -5,8 +5,9 @@ package gortmp
 import (
 	"bytes"
 	"fmt"
-	"github.com/zhangpeihao/goamf"
-	"github.com/zhangpeihao/log"
+
+	"github.com/golang/glog"
+	amf "github.com/zhangpeihao/goamf"
 )
 
 type InboundStreamHandler interface {
@@ -94,22 +95,19 @@ func (stream *inboundStream) Received(message *Message) bool {
 			cmd.IsFlex = true
 			_, err = message.Buf.ReadByte()
 			if err != nil {
-				logger.ModulePrintf(logHandler, log.LOG_LEVEL_WARNING,
-					"inboundStream::Received() Read first in flex commad err:", err)
+				glog.Warningf("inboundStream::Received() Read first in flex commad err:", err)
 				return true
 			}
 		}
 		cmd.Name, err = amf.ReadString(message.Buf)
 		if err != nil {
-			logger.ModulePrintf(logHandler, log.LOG_LEVEL_WARNING,
-				"inboundStream::Received() AMF0 Read name err:", err)
+			glog.Warningf("inboundStream::Received() AMF0 Read name err:", err)
 			return true
 		}
 		var transactionID float64
 		transactionID, err = amf.ReadDouble(message.Buf)
 		if err != nil {
-			logger.ModulePrintf(logHandler, log.LOG_LEVEL_WARNING,
-				"inboundStream::Received() AMF0 Read transactionID err:", err)
+			glog.Warningf("inboundStream::Received() AMF0 Read transactionID err:", err)
 			return true
 		}
 		cmd.TransactionID = uint32(transactionID)
@@ -117,8 +115,7 @@ func (stream *inboundStream) Received(message *Message) bool {
 		for message.Buf.Len() > 0 {
 			object, err = amf.ReadValue(message.Buf)
 			if err != nil {
-				logger.ModulePrintf(logHandler, log.LOG_LEVEL_WARNING,
-					"inboundStream::Received() AMF0 Read object err:", err)
+				glog.Warningf("inboundStream::Received() AMF0 Read object err:", err)
 				return true
 			}
 			cmd.Objects = append(cmd.Objects, object)
@@ -136,7 +133,7 @@ func (stream *inboundStream) Received(message *Message) bool {
 		case "closeStream":
 			return stream.onCloseStream(cmd)
 		default:
-			logger.ModulePrintf(logHandler, log.LOG_LEVEL_TRACE, "inboundStream::Received: %+v\n", cmd)
+			glog.V(1).Infof("inboundStream::Received: %+v\n", cmd)
 		}
 
 	}
@@ -180,14 +177,12 @@ func (stream *inboundStream) SendData(dataType uint8, data []byte, deltaTimestam
 func (stream *inboundStream) onPlay(cmd *Command) bool {
 	// Get stream name
 	if cmd.Objects == nil || len(cmd.Objects) < 2 || cmd.Objects[1] == nil {
-		logger.ModulePrintf(logHandler, log.LOG_LEVEL_WARNING,
-			"inboundStream::onPlay: command error 1! %+v\n", cmd)
+		glog.Warningf("inboundStream::onPlay: command error 1! %+v\n", cmd)
 		return true
 	}
 
 	if streamName, ok := cmd.Objects[1].(string); !ok {
-		logger.ModulePrintf(logHandler, log.LOG_LEVEL_WARNING,
-			"inboundStream::onPlay: command error 2! %+v\n", cmd)
+		glog.Warningf("inboundStream::onPlay: command error 2! %+v\n", cmd)
 		return true
 	} else {
 		stream.streamName = streamName

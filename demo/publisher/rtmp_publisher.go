@@ -2,24 +2,18 @@ package main
 
 import (
 	"flag"
-	"fmt"
 	"os"
 	"time"
 
+	"github.com/golang/glog"
 	rtmp "github.com/wangyoucao577/gortmp"
 	flv "github.com/zhangpeihao/goflv"
-	"github.com/zhangpeihao/log"
-)
-
-const (
-	programName = "RtmpPublisher"
-	version     = "0.0.1"
 )
 
 var (
-	url         *string = flag.String("URL", "rtmp://video-center.alivecdn.com/AppName/StreamName?vhost=live.gz-app.com", "The rtmp url to connect.")
-	streamName  *string = flag.String("Stream", "camstream", "Stream name to play.")
-	flvFileName *string = flag.String("FLV", "./v_4097.flv", "FLV file to publishs.")
+	url         *string = flag.String("url", "rtmp://localhost:1935/live/", "The rtmp url to connect.")
+	streamName  *string = flag.String("stream", "", "Stream name to play.")
+	flvFileName *string = flag.String("flv", "1.flv", "FLV file to publish.")
 )
 
 type TestOutboundConnHandler struct {
@@ -39,22 +33,22 @@ func (handler *TestOutboundConnHandler) OnStatus(conn rtmp.OutboundConn) {
 		return
 	}
 	status, err = obConn.Status()
-	fmt.Printf("@@@@@@@@@@@@@status: %d, err: %v\n", status, err)
+	glog.Infof("@@@@@@@@@@@@@status: %d, err: %v\n", status, err)
 }
 
 func (handler *TestOutboundConnHandler) OnClosed(conn rtmp.Conn) {
-	fmt.Printf("@@@@@@@@@@@@@Closed\n")
+	glog.Infof("@@@@@@@@@@@@@Closed\n")
 }
 
 func (handler *TestOutboundConnHandler) OnReceived(conn rtmp.Conn, message *rtmp.Message) {
 }
 
 func (handler *TestOutboundConnHandler) OnReceivedRtmpCommand(conn rtmp.Conn, command *rtmp.Command) {
-	fmt.Printf("ReceviedRtmpCommand: %+v\n", command)
+	glog.Infof("ReceviedRtmpCommand: %+v\n", command)
 }
 
 func (handler *TestOutboundConnHandler) OnStreamCreated(conn rtmp.OutboundConn, stream rtmp.OutboundStream) {
-	fmt.Printf("Stream created: %d\n", stream.ID())
+	glog.Infof("Stream created: %d\n", stream.ID())
 	createStreamChan <- stream
 }
 func (handler *TestOutboundConnHandler) OnPlayStart(stream rtmp.OutboundStream) {
@@ -66,22 +60,22 @@ func (handler *TestOutboundConnHandler) OnPublishStart(stream rtmp.OutboundStrea
 }
 
 func publish(stream rtmp.OutboundStream) {
-	fmt.Println("1")
+	glog.Infoln("1")
 	var err error
 	flvFile, err = flv.OpenFile(*flvFileName)
 	if err != nil {
-		fmt.Println("Open FLV dump file error:", err)
+		glog.Infof("Open FLV dump file error:", err)
 		return
 	}
-	fmt.Println("2")
+	glog.Infoln("2")
 	defer flvFile.Close()
 	startTs := uint32(0)
 	startAt := time.Now().UnixNano()
 	preTs := uint32(0)
-	fmt.Println("3")
+	glog.Infoln("3")
 	for status == rtmp.OUTBOUND_CONN_STATUS_CREATE_STREAM_OK {
 		if flvFile.IsFinished() {
-			fmt.Println("@@@@@@@@@@@@@@File finished")
+			glog.Info("@@@@@@@@@@@@@@File finished")
 			flvFile.LoopBack()
 			startAt = time.Now().UnixNano()
 			startTs = uint32(0)
@@ -89,7 +83,7 @@ func publish(stream rtmp.OutboundStream) {
 		}
 		header, data, err := flvFile.ReadTag()
 		if err != nil {
-			fmt.Println("flvFile.ReadTag() error:", err)
+			glog.Errorf("flvFile.ReadTag() error:", err)
 			break
 		}
 		switch header.TagType {
@@ -107,15 +101,15 @@ func publish(stream rtmp.OutboundStream) {
 		if header.Timestamp > startTs {
 			diff1 = header.Timestamp - startTs
 		} else {
-			fmt.Printf("@@@@@@@@@@@@@@diff1 header(%+v), startTs: %d\n", header, startTs)
+			glog.Warningf("@@@@@@@@@@@@@@diff1 header(%+v), startTs: %d\n", header, startTs)
 		}
 		if diff1 > preTs {
 			//			deltaTs = diff1 - preTs
 			preTs = diff1
 		}
-		fmt.Printf("@@@@@@@@@@@@@@diff1 header(%+v), startTs: %d\n", header, startTs)
+		glog.Warningf("@@@@@@@@@@@@@@diff1 header(%+v), startTs: %d\n", header, startTs)
 		if err = stream.PublishData(header.TagType, data, diff1); err != nil {
-			fmt.Println("PublishData() error:", err)
+			glog.Errorf("PublishData() error:", err)
 			break
 		}
 		diff2 := uint32((time.Now().UnixNano() - startAt) / 1000000)
@@ -128,34 +122,28 @@ func publish(stream rtmp.OutboundStream) {
 }
 
 func main() {
-	flag.Usage = func() {
-		fmt.Fprintf(os.Stderr, "%s version[%s]\r\nUsage: %s [OPTIONS]\r\n", programName, version, os.Args[0])
-		flag.PrintDefaults()
-	}
 	flag.Parse()
+	defer glog.Flush()
 
-	l := log.NewLogger(".", "publisher", nil, 60, 3600*24, true)
-	rtmp.InitLogger(l)
-	defer l.Close()
 	createStreamChan = make(chan rtmp.OutboundStream)
 	testHandler := &TestOutboundConnHandler{}
-	fmt.Println("to dial")
-	fmt.Println("a")
+	glog.Info("to dial")
+	glog.Info("a")
 	var err error
 	obConn, err = rtmp.Dial(*url, testHandler, 100)
 	if err != nil {
-		fmt.Println("Dial error", err)
+		glog.Errorf("Dial error", err)
 		os.Exit(-1)
 	}
-	fmt.Println("b")
+	glog.Info("b")
 	defer obConn.Close()
-	fmt.Println("to connect")
+	glog.Info("to connect")
 	err = obConn.Connect()
 	if err != nil {
-		fmt.Printf("Connect error: %s", err.Error())
+		glog.Errorf("Connect error: %s", err.Error())
 		os.Exit(-1)
 	}
-	fmt.Println("c")
+	glog.Info("c")
 	for {
 		select {
 		case stream := <-createStreamChan:
@@ -163,12 +151,12 @@ func main() {
 			stream.Attach(testHandler)
 			err = stream.Publish(*streamName, "live")
 			if err != nil {
-				fmt.Printf("Publish error: %s", err.Error())
+				glog.Errorf("Publish error: %s", err.Error())
 				os.Exit(-1)
 			}
 
 		case <-time.After(1 * time.Second):
-			fmt.Printf("Audio size: %d bytes; Vedio size: %d bytes\n", audioDataSize, videoDataSize)
+			glog.Infof("Audio size: %d bytes; Vedio size: %d bytes\n", audioDataSize, videoDataSize)
 		}
 	}
 }

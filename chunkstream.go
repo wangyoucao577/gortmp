@@ -2,9 +2,7 @@
 
 package gortmp
 
-import (
-	"github.com/zhangpeihao/log"
-)
+import "github.com/golang/glog"
 
 // Chunk stream
 //
@@ -102,8 +100,7 @@ func (chunkStream *OutboundChunkStream) NewOutboundHeader(message *Message) *Hea
 	} else {
 		header.ExtendedTimestamp = 0
 	}
-	logger.ModulePrintf(logHandler, log.LOG_LEVEL_DEBUG,
-		"OutboundChunkStream::NewOutboundHeader() header: %+v\n", header)
+	glog.V(2).Infof("OutboundChunkStream::NewOutboundHeader() header: %+v\n", header)
 	chunkStream.lastHeader = header
 	chunkStream.lastOutAbsoluteTimestamp = timestamp
 	return header

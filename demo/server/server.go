@@ -8,9 +8,9 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/golang/glog"
 	rtmp "github.com/wangyoucao577/gortmp"
 	flv "github.com/zhangpeihao/goflv"
-	"github.com/zhangpeihao/log"
 )
 
 const (
@@ -86,16 +86,9 @@ func (handler *ServerHandler) NewConnection(ibConn rtmp.InboundConn, connectReq 
 }
 
 func main() {
-	flag.Usage = func() {
-		fmt.Fprintf(os.Stderr, "%s version[%s]\r\nUsage: %s [OPTIONS]\r\n", programName, version, os.Args[0])
-		flag.PrintDefaults()
-	}
 	flag.Parse()
+	defer glog.Flush()
 
-	l := log.NewLogger(".", "server", nil, 60, 3600*24, true)
-	l.SetMainLevel(log.LOG_LEVEL_DEBUG)
-	rtmp.InitLogger(l)
-	defer l.Close()
 	handler := &ServerHandler{}
 	server, err := rtmp.NewServer("tcp", *address, handler)
 	if err != nil {

@@ -8,10 +8,11 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
-	"github.com/zhangpeihao/goamf"
-	"github.com/zhangpeihao/log"
 	"net"
 	"time"
+
+	"github.com/golang/glog"
+	amf "github.com/zhangpeihao/goamf"
 )
 
 const (
@@ -92,11 +93,11 @@ func Dial(url string, handler OutboundConnHandler, maxChannelNumber int) (Outbou
 	}
 	br := bufio.NewReader(c)
 	bw := bufio.NewWriter(c)
-	timeout := time.Duration(10*time.Second)
+	timeout := time.Duration(10 * time.Second)
 	err = Handshake(c, br, bw, timeout)
 	//err = HandshakeSample(c, br, bw, timeout)
 	if err == nil {
-		logger.ModulePrintln(logHandler, log.LOG_LEVEL_DEBUG, "Handshake OK")
+		glog.V(1).Infof("Handshake OK")
 
 		obConn := &outboundConn{
 			url:          url,
@@ -303,8 +304,7 @@ func (obConn *outboundConn) OnReceivedRtmpCommand(conn Conn, command *Command) {
 					if ok {
 						newChunkStream, err := obConn.conn.CreateMediaChunkStream()
 						if err != nil {
-							logger.ModulePrintf(logHandler, log.LOG_LEVEL_WARNING,
-								"outboundConn::ReceivedRtmpCommand() CreateMediaChunkStream err:", err)
+							glog.Warningf("outboundConn::ReceivedRtmpCommand() CreateMediaChunkStream err:", err)
 							return
 						}
 						stream := &outboundStream{
@@ -324,11 +324,9 @@ func (obConn *outboundConn) OnReceivedRtmpCommand(conn Conn, command *Command) {
 	case "_error":
 		transaction, found := obConn.transactions[command.TransactionID]
 		if found {
-			logger.ModulePrintf(logHandler, log.LOG_LEVEL_TRACE,
-				"Command(%d) %s error\n", command.TransactionID, transaction)
+			glog.V(1).Infof("Command(%d) %s error\n", command.TransactionID, transaction)
 		} else {
-			logger.ModulePrintf(logHandler, log.LOG_LEVEL_TRACE,
-				"Command(%d) not been found\n", command.TransactionID)
+			glog.V(1).Infof("Command(%d) not been found\n", command.TransactionID)
 		}
 	case "onBWCheck":
 	}

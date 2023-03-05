@@ -11,9 +11,9 @@ import (
 	"os"
 	"time"
 
+	"github.com/golang/glog"
 	rtmp "github.com/wangyoucao577/gortmp"
 	flv "github.com/zhangpeihao/goflv"
-	"github.com/zhangpeihao/log"
 )
 
 const (
@@ -72,16 +72,11 @@ func (handler *TestOutboundConnHandler) OnStreamCreated(conn rtmp.OutboundConn, 
 }
 
 func main() {
-	flag.Usage = func() {
-		fmt.Fprintf(os.Stderr, "%s version[%s]\r\nUsage: %s [OPTIONS]\r\n", programName, version, os.Args[0])
-		flag.PrintDefaults()
-	}
 	flag.Parse()
+	defer glog.Flush()
 
 	fmt.Printf("rtmp:%s stream:%s flv:%s\r\n", *url, *streamName, *dumpFlv)
-	l := log.NewLogger(".", "player", nil, 60, 3600*24, true)
-	rtmp.InitLogger(l)
-	defer l.Close()
+
 	// Create flv file
 	if len(*dumpFlv) > 0 {
 		var err error

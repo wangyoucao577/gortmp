@@ -7,11 +7,12 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"github.com/zhangpeihao/goamf"
-	"github.com/zhangpeihao/log"
 	"net"
 	"sync"
 	"time"
+
+	"github.com/golang/glog"
+	amf "github.com/zhangpeihao/goamf"
 )
 
 const (
@@ -100,7 +101,7 @@ func (ibConn *inboundConn) OnReceivedRtmpCommand(conn Conn, command *Command) {
 		// Create a new stream
 		ibConn.onCreateStream(command)
 	default:
-		logger.ModulePrintf(logHandler, log.LOG_LEVEL_TRACE, "inboundConn::ReceivedRtmpCommand: %+v\n", command)
+		glog.V(1).Infof("inboundConn::ReceivedRtmpCommand: %+v\n", command)
 	}
 }
 
@@ -170,25 +171,21 @@ func (ibConn *inboundConn) releaseStream(streamID uint32) {
 }
 
 func (ibConn *inboundConn) onConnect(cmd *Command) {
-	logger.ModulePrintln(logHandler, log.LOG_LEVEL_TRACE,
-		"inboundConn::onConnect")
+	glog.V(1).Infof("inboundConn::onConnect")
 	ibConn.connectReq = cmd
 	if cmd.Objects == nil {
-		logger.ModulePrintf(logHandler, log.LOG_LEVEL_WARNING,
-			"inboundConn::onConnect cmd.Object == nil\n")
+		glog.Warningf("inboundConn::onConnect cmd.Object == nil\n")
 		ibConn.sendConnectErrorResult(cmd)
 		return
 	}
 	if len(cmd.Objects) == 0 {
-		logger.ModulePrintf(logHandler, log.LOG_LEVEL_WARNING,
-			"inboundConn::onConnect len(cmd.Object) == 0\n")
+		glog.Warningf("inboundConn::onConnect len(cmd.Object) == 0\n")
 		ibConn.sendConnectErrorResult(cmd)
 		return
 	}
 	params, ok := cmd.Objects[0].(amf.Object)
 	if !ok {
-		logger.ModulePrintf(logHandler, log.LOG_LEVEL_WARNING,
-			"inboundConn::onConnect cmd.Object[0] is not an amd object\n")
+		glog.Warningf("inboundConn::onConnect cmd.Object[0] is not an amd object\n")
 		ibConn.sendConnectErrorResult(cmd)
 		return
 	}
@@ -196,15 +193,13 @@ func (ibConn *inboundConn) onConnect(cmd *Command) {
 	// Get app
 	app, found := params["app"]
 	if !found {
-		logger.ModulePrintf(logHandler, log.LOG_LEVEL_WARNING,
-			"inboundConn::onConnect no app value in cmd.Object[0]\n")
+		glog.Warningf("inboundConn::onConnect no app value in cmd.Object[0]\n")
 		ibConn.sendConnectErrorResult(cmd)
 		return
 	}
 	ibConn.app, ok = app.(string)
 	if !ok {
-		logger.ModulePrintf(logHandler, log.LOG_LEVEL_WARNING,
-			"inboundConn::onConnect cmd.Object[0].app is not a string\n")
+		glog.Warningf("inboundConn::onConnect cmd.Object[0].app is not a string\n")
 		ibConn.sendConnectErrorResult(cmd)
 		return
 	}
@@ -223,13 +218,11 @@ func (ibConn *inboundConn) onConnect(cmd *Command) {
 }
 
 func (ibConn *inboundConn) onCreateStream(cmd *Command) {
-	logger.ModulePrintln(logHandler, log.LOG_LEVEL_TRACE,
-		"inboundConn::onCreateStream")
+	glog.V(1).Infof("inboundConn::onCreateStream")
 	// New inbound stream
 	newChunkStream, err := ibConn.conn.CreateMediaChunkStream()
 	if err != nil {
-		logger.ModulePrintf(logHandler, log.LOG_LEVEL_WARNING,
-			"outboundConn::ReceivedCommand() CreateMediaChunkStream err:", err)
+		glog.Warningf("outboundConn::ReceivedCommand() CreateMediaChunkStream err:", err)
 		return
 	}
 	stream := &inboundStream{
