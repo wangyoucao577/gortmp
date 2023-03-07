@@ -39,7 +39,12 @@ func (handler *TestOutboundConnHandler) OnStatus(conn rtmp.OutboundConn) {
 		return
 	}
 	status, err = obConn.Status()
-	glog.Infof("OnStatus: %s(%d), err: %v\n", rtmp.OutboundConnStatusDescription(status), status, err)
+
+	if err != nil {
+		glog.Infof("OnStatus: %s(%d), err: %v\n", rtmp.OutboundConnStatusDescription(status), status, err)
+	} else {
+		glog.Infof("OnStatus: %s(%d)\n", rtmp.OutboundConnStatusDescription(status), status)
+	}
 }
 
 func (handler *TestOutboundConnHandler) OnClosed(conn rtmp.Conn) {
@@ -47,11 +52,11 @@ func (handler *TestOutboundConnHandler) OnClosed(conn rtmp.Conn) {
 }
 
 func (handler *TestOutboundConnHandler) OnReceived(conn rtmp.Conn, message *rtmp.Message) {
-	glog.Infof("OnReceived: %+v\n", message)
+	glog.V(1).Infof("OnReceived: %+v\n", message)
 }
 
 func (handler *TestOutboundConnHandler) OnReceivedRtmpCommand(conn rtmp.Conn, command *rtmp.Command) {
-	glog.Infof("OnReceivedRtmpCommand: %+v\n", command)
+	glog.V(1).Infof("OnReceivedRtmpCommand: %+v\n", command)
 }
 
 func (handler *TestOutboundConnHandler) OnStreamCreated(conn rtmp.OutboundConn, stream rtmp.OutboundStream) {
@@ -69,7 +74,7 @@ func (handler *TestOutboundConnHandler) OnPublishStart(stream rtmp.OutboundStrea
 }
 
 func publish(stream rtmp.OutboundStream) {
-	glog.Infof("publish, stream: %d\n", stream.ID())
+	glog.V(1).Infof("publish started on stream: %d\n", stream.ID())
 
 	flvFile, err := flv.OpenFile(flags.inputFilePath)
 	if err != nil {
@@ -142,7 +147,7 @@ func main() {
 	createStreamChan = make(chan rtmp.OutboundStream)
 	testHandler := &TestOutboundConnHandler{}
 
-	glog.Info("to dial")
+	glog.V(1).Info("to dial")
 	obConn, err = rtmp.Dial(flags.url, testHandler, 100)
 	if err != nil {
 		glog.Errorf("Dial failed, err: %v", err)
@@ -150,13 +155,13 @@ func main() {
 	}
 	defer obConn.Close()
 
-	glog.Info("to connect")
+	glog.V(1).Info("to connect")
 	err = obConn.Connect()
 	if err != nil {
 		glog.Errorf("Connect failed, err: %v", err)
 		os.Exit(-1)
 	}
-	glog.Info("after connect")
+	glog.V(1).Info("after connect")
 
 	var lastAudioDataSize, lastVideoDataSize int64
 	var lastTimeInSeconds float64
