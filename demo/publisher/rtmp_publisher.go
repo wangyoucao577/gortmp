@@ -29,6 +29,7 @@ var obConn rtmp.OutboundConn
 var createStreamChan chan rtmp.OutboundStream
 var videoDataSize int64
 var audioDataSize int64
+var startPublishTime time.Time
 
 var status uint
 
@@ -80,10 +81,11 @@ func publish(stream rtmp.OutboundStream) {
 	startTs := uint32(0)
 	startAt := time.Now().UnixNano()
 	preTs := uint32(0)
+	startPublishTime = time.Now()
 
 	for status == rtmp.OUTBOUND_CONN_STATUS_CREATE_STREAM_OK {
 		if flvFile.IsFinished() {
-			glog.Info("FLV file is finished")
+			glog.Info("flv file is finished, loopback.")
 			flvFile.LoopBack()
 			startAt = time.Now().UnixNano()
 			startTs = uint32(0)
@@ -156,6 +158,8 @@ func main() {
 	}
 	glog.Info("after connect")
 
+	var lastAudioDataSize, lastVideoDataSize int64
+	var lastTimeInSeconds float64
 	for {
 		select {
 		case stream := <-createStreamChan:
@@ -168,7 +172,17 @@ func main() {
 			}
 
 		case <-time.After(1 * time.Second):
-			glog.Infof("Audio size: %d bytes; Vedio size: %d bytes\n", audioDataSize, videoDataSize)
+			calcKbps := func(bytes int64, seconds float64) int64 {
+				return int64(float64(bytes) * 8 / 1000 / seconds)
+			}
+			aSize, vSize := audioDataSize, videoDataSize
+			timeInSeconds := time.Since(startPublishTime).Seconds()
+			aKbps, vKbps := calcKbps(aSize-lastAudioDataSize, timeInSeconds-lastTimeInSeconds), calcKbps(vSize-lastVideoDataSize, timeInSeconds-lastTimeInSeconds)
+			glog.Infof("publish bitrate %d kbps(audio %d, video %d), totally sent %d bytes(audio %d, video %d) in %f seconds\n",
+				aKbps+vKbps, aKbps, vKbps, aSize+vSize, aSize, vSize, timeInSeconds)
+
+			lastAudioDataSize, lastVideoDataSize = aSize, vSize
+			lastTimeInSeconds = timeInSeconds
 		}
 	}
 }
