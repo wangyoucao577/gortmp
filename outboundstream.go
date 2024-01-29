@@ -121,7 +121,7 @@ func (stream *outboundStream) Publish(streamName, howToPublish string) (err erro
 	conn := stream.conn.Conn()
 	// Create publish command
 	cmd := &Command{
-		IsFlex:        true,
+		IsFlex:        false,
 		Name:          "publish",
 		TransactionID: 0,
 		Objects:       make([]interface{}, 3),
@@ -135,7 +135,7 @@ func (stream *outboundStream) Publish(streamName, howToPublish string) (err erro
 	}
 
 	// Construct message
-	message := NewMessage(stream.chunkStreamID, COMMAND_AMF3, stream.id, 0, nil)
+	message := NewMessage(stream.chunkStreamID, COMMAND_AMF0, stream.id, 0, nil)
 	if err = cmd.Write(message.Buf); err != nil {
 		return
 	}
